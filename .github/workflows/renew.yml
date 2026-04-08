@@ -8,7 +8,20 @@ on:
 jobs:
   run_jrm_renew:
     runs-on: ubuntu-latest
+    
+    # 1. 必须赋予写入权限
+    permissions:
+      contents: write
+
     steps:
+      # =========================================================
+      # ⚠️ 新增：必须先检出当前仓库，否则无法提交 time.txt
+      # =========================================================
+      - name: 📥 检出当前仓库
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: 📥 下载私库脚本
         uses: actions/checkout@v4
         with:
@@ -70,3 +83,27 @@ jobs:
         with:
           name: debug-screenshots
           path: "*.png"
+
+      # =========================================================
+      # ⏱️ 新增：提交 time.txt 到仓库
+      # =========================================================
+      - name: ⏱️ Commit time.txt to repo
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          CURRENT_TIME=$(date +'%Y-%m-%d %H:%M:%S')
+          echo "最后续期运行时间：$CURRENT_TIME" > time.txt
+
+          git add time.txt
+          
+          if git diff --cached --quiet; then
+            echo "没有内容变化，跳过提交。"
+          else
+            git commit -m "⏱️ KeepAlive: $CURRENT_TIME"
+            git pull --rebase origin ${{ github.ref_name }}
+            git push origin HEAD:${{ github.ref_name }}
+          fi
